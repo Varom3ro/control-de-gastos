@@ -1,17 +1,8 @@
 const defaultCategories = [
-    { id: 'cat1', name: 'Salario', planned: 650.00, type: 'income' },
-    { id: 'cat2', name: 'Mercado Gochos', planned: 48.00, type: 'expense' },
-    { id: 'cat3', name: 'Limpieza (María)', planned: 80.00, type: 'expense' },
-    { id: 'cat4', name: 'Spotify', planned: 9.00, type: 'expense' },
-    { id: 'cat5', name: 'Thondernet', planned: 20.00, type: 'expense' },
-    { id: 'cat6', name: 'Agua', planned: 10.00, type: 'expense' },
-    { id: 'cat7', name: 'Póliza', planned: 46.67, type: 'expense' },
-    { id: 'cat8', name: 'Gasolina', planned: 40.00, type: 'expense' },
-    { id: 'cat9', name: 'Facebank', planned: 6.00, type: 'expense' },
-    { id: 'cat10', name: 'Deuda Andrea', planned: 200.00, type: 'expense' },
-    { id: 'cat11', name: 'Basquet', planned: 20.00, type: 'expense' },
-    { id: 'cat12', name: 'Cachea', planned: 50.00, type: 'expense' },
-    { id: 'cat13', name: 'Esparcimiento', planned: 120.00, type: 'expense' }
+    { id: 'cat1', name: 'Salario', planned: 0, type: 'income' },
+    { id: 'cat2', name: 'Mercado', planned: 0, type: 'expense' },
+    { id: 'cat3', name: 'Servicios', planned: 0, type: 'expense' },
+    { id: 'cat13', name: 'Esparcimiento', planned: 0, type: 'expense' }
 ];
 
 let categories = JSON.parse(localStorage.getItem('gastos_categories')) || defaultCategories;
@@ -365,6 +356,29 @@ function generateCatRow(cat) {
             </div>
         </div>
     `;
+}
+
+function openBackupModal() {
+    const data = JSON.stringify({ transactions, categories });
+    document.getElementById('backup-data').value = btoa(unescape(encodeURIComponent(data)));
+    document.getElementById('backup-modal').classList.remove('hidden');
+}
+
+function importData() {
+    try {
+        const raw = document.getElementById('backup-data').value;
+        const data = JSON.parse(decodeURIComponent(escape(atob(raw))));
+        if (data.transactions && data.categories) {
+            transactions = data.transactions;
+            categories = data.categories;
+            saveData();
+            renderApp();
+            closeModal('backup-modal');
+            closeModal('settings-modal');
+        }
+    } catch (e) {
+        alert('Código inválido');
+    }
 }
 
 function openCatForm(id = null) {
