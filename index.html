@@ -126,8 +126,24 @@
                 <button type="button" class="btn primary-btn btn-sm" onclick="openCatForm()">+ Nueva</button>
             </div>
             <div id="settings-cat-list" class="settings-list"></div>
+            <div class="modal-actions" style="margin-top: 16px; flex-direction: column; gap: 8px;">
+                <button type="button" class="btn secondary-btn" style="width: 100%;" onclick="openBackupModal()">Sincronizar (Backup)</button>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                    <button type="button" class="btn cancel-btn" style="flex: 1;" onclick="closeModal('settings-modal')">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Backup -->
+    <div id="backup-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Sincronizar Datos</h3>
+            <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Copia el código para exportar o pega uno para importar datos.</p>
+            <textarea id="backup-data" style="width: 100%; height: 200px; background: #0f172a; color: #94a3b8; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 10px;"></textarea>
             <div class="modal-actions">
-                <button type="button" class="btn cancel-btn" onclick="closeModal('settings-modal')">Cerrar</button>
+                <button type="button" class="btn cancel-btn" onclick="closeModal('backup-modal')">Cancelar</button>
+                <button type="button" class="btn primary-btn" onclick="importData()">Aplicar</button>
             </div>
         </div>
     </div>
