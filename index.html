@@ -23,7 +23,10 @@
                     </div>
                 </div>
                 <div style="display: flex; flex-direction: column; align-items: flex-end;">
-                    <button id="settings-btn" class="icon-btn">⚙️</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="visibility-btn" class="icon-btn" onclick="toggleVisibility()">👁️</button>
+                        <button id="settings-btn" class="icon-btn" onclick="openSettings()">⚙️</button>
+                    </div>
                     <span id="bcv-rate" style="font-size: 12px; color: var(--income); font-weight: 600; margin-top: 2px; cursor: pointer; text-decoration: underline dashed;" title="Tocar para editar">BCV: ...</span>
                 </div>
             </div>
@@ -97,8 +100,8 @@
                     <div style="display: flex; gap: 8px;">
                         <input type="number" id="t-amount" step="0.01" required placeholder="0.00" style="flex: 1;">
                         <select id="t-currency" style="width: auto; background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 0 12px; font-weight: 500; font-size: 14px;">
-                            <option value="USD">USD ($)</option>
                             <option value="VES">BS (Bs)</option>
+                            <option value="USD">USD ($)</option>
                         </select>
                     </div>
                 </div>

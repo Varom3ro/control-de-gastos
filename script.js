@@ -7,6 +7,16 @@ const defaultCategories = [
 
 let categories = JSON.parse(localStorage.getItem('gastos_categories')) || defaultCategories;
 let transactions = JSON.parse(localStorage.getItem('gastos_transactions')) || [];
+let amountsHidden = localStorage.getItem('gastos_hidden') === 'true';
+
+function toggleVisibility() {
+    amountsHidden = !amountsHidden;
+    localStorage.setItem('gastos_hidden', amountsHidden);
+    if(document.getElementById('visibility-btn')) {
+        document.getElementById('visibility-btn').textContent = amountsHidden ? '🔒' : '👁️';
+    }
+    renderApp();
+}
 
 const currentDateObj = new Date();
 let currentViewMonth = currentDateObj.getMonth();
@@ -84,6 +94,10 @@ function openAddModal() {
     document.getElementById('t-date').valueAsDate = new Date();
     form.reset();
     document.getElementById('t-date').valueAsDate = new Date();
+
+    // Default to Esparcimiento
+    const esparcimiento = categories.find(c => c.name.toLowerCase() === 'esparcimiento');
+    if (esparcimiento) document.getElementById('t-category').value = esparcimiento.id;
     
     modal.classList.remove('hidden');
 }
@@ -141,12 +155,17 @@ function saveData() {
 }
 
 function formatMoney(amount) {
+    if (amountsHidden) return '***';
     return '$' + parseFloat(amount).toFixed(2);
 }
 
 function renderApp() {
     let totalIncome = 0;
     let totalSpent = 0;
+    
+    if(document.getElementById('visibility-btn')) {
+        document.getElementById('visibility-btn').textContent = amountsHidden ? '🔒' : '👁️';
+    }
     
     document.getElementById('current-month-label').textContent = `${monthNames[currentViewMonth]} ${currentViewYear}`;
 
@@ -188,6 +207,19 @@ function renderApp() {
     window.lastGlobalAvailable = globalAvailable;
     updateBsBalance();
 
+    // Lógica dinámica para Esparcimiento
+    const salarioCat = categories.find(c => c.name.toLowerCase() === 'salario');
+    const esparcimientoCat = categories.find(c => c.name.toLowerCase() === 'esparcimiento');
+    if (salarioCat && esparcimientoCat) {
+        let expenseMetas = 0;
+        categories.forEach(c => {
+            if (c.type === 'expense' && c.id !== esparcimientoCat.id) {
+                expenseMetas += c.planned;
+            }
+        });
+        esparcimientoCat.planned = Math.max(0, salarioCat.planned - expenseMetas);
+    }
+
     // Render Categories
     categoriesContainer.innerHTML = '';
     categories.forEach(cat => {
@@ -202,7 +234,8 @@ function renderApp() {
             progressClass += ' income';
             remainingText = `${formatMoney(spent)} / ${formatMoney(cat.planned)} cobrado`;
         } else {
-            if (percent >= 100) progressClass += ' over';
+            if (percent > 100) progressClass += ' over';
+            else if (percent === 100) progressClass += ' income'; // Usamos el verde de income para el 100% exacto
             else if (percent >= 80) progressClass += ' warning';
             
             if (remaining < 0) remainingText = `Te excediste por ${formatMoney(Math.abs(remaining))}`;
@@ -210,7 +243,7 @@ function renderApp() {
         }
 
         const html = `
-            <div class="cat-card">
+            <div class="cat-card" draggable="true" data-id="${cat.id}">
                 <div class="cat-header">
                     <span class="cat-name">${cat.name}</span>
                     <span class="cat-amounts">
@@ -299,6 +332,10 @@ async function fetchBCVRate() {
 function updateBsBalance() {
     const el = document.getElementById('total-available-bs');
     if (el && window.lastBCVRate && window.lastGlobalAvailable !== undefined) {
+        if (amountsHidden) {
+            el.textContent = 'Bs. ***';
+            return;
+        }
         const totalBs = window.lastGlobalAvailable * window.lastBCVRate;
         const formattedBs = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(totalBs);
         el.textContent = `Bs. ${formattedBs}`;
@@ -452,11 +489,50 @@ function deleteCat(id) {
 renderApp();
 fetchBCVRate();
 
-// PWA Service Worker Registration
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js')
-            .then(reg => console.log('SW Registered'))
-            .catch(err => console.log('SW Error', err));
-    });
+// Drag & Drop Reordering
+let draggedItem = null;
+
+categoriesContainer.addEventListener('dragstart', (e) => {
+    draggedItem = e.target.closest('.cat-card');
+    if (draggedItem) {
+        draggedItem.classList.add('dragging');
+        setTimeout(() => (draggedItem.style.display = 'none'), 0);
+    }
+});
+
+categoriesContainer.addEventListener('dragend', (e) => {
+    if (draggedItem) {
+        draggedItem.classList.remove('dragging');
+        draggedItem.style.display = 'block';
+        draggedItem = null;
+        
+        // Update array order based on DOM
+        const currentCards = [...categoriesContainer.querySelectorAll('.cat-card')];
+        const newOrderIds = currentCards.map(c => c.dataset.id);
+        categories.sort((a, b) => newOrderIds.indexOf(a.id) - newOrderIds.indexOf(b.id));
+        saveData();
+    }
+});
+
+categoriesContainer.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const afterElement = getDragAfterElement(categoriesContainer, e.clientY);
+    if (afterElement == null) {
+        categoriesContainer.appendChild(draggedItem);
+    } else {
+        categoriesContainer.insertBefore(draggedItem, afterElement);
+    }
+});
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.cat-card:not(.dragging)')];
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
