@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Control de Gastos</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-top">
+                <div class="header-title-group" style="display: flex; flex-direction: column; gap: 4px;">
+                    <h1 style="margin-bottom: 0;">Mi Balance</h1>
+                    <div class="month-selector" style="display: flex; align-items: center; margin-left: -4px;">
+                        <button id="prev-month-btn" class="icon-btn" style="font-size: 14px; padding: 4px;">◀</button>
+                        <span id="current-month-label" style="font-size: 13px; font-weight: 500; color: var(--text-muted); margin: 0 4px;"></span>
+                        <button id="next-month-btn" class="icon-btn" style="font-size: 14px; padding: 4px;">▶</button>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                    <button id="settings-btn" class="icon-btn">⚙️</button>
+                    <span id="bcv-rate" style="font-size: 12px; color: var(--income); font-weight: 600; margin-top: 2px; cursor: pointer; text-decoration: underline dashed;" title="Tocar para editar">BCV: ...</span>
+                </div>
+            </div>
+            
+            <div class="main-card">
+                <p class="subtitle">Disponible</p>
+                <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; margin-bottom: 24px;">
+                    <div></div>
+                    <h2 id="total-available" style="margin-bottom: 0; text-align: center;">$0.00</h2>
+                    <div style="text-align: left; padding-left: 8px;">
+                        <span id="total-available-bs" style="font-size: 12px; color: rgba(255, 255, 255, 0.5); font-weight: 500;">Bs. 0.00</span>
+                    </div>
+                </div>
+                <div class="card-details">
+                    <div class="detail col-income">
+                        <span>Ingresos</span>
+                        <strong id="total-income">$0.00</strong>
+                    </div>
+                    <div class="detail col-expense">
+                        <span>Gastado</span>
+                        <strong id="total-spent">$0.00</strong>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-target="budget-view">Presupuesto</button>
+            <button class="tab-btn" data-target="history-view">Historial</button>
+        </div>
+
+        <main>
+            <!-- Vista Presupuesto -->
+            <section id="budget-view" class="view active">
+                <div class="section-header">
+                    <h3>Progreso de Gastos</h3>
+                    <!-- button id="edit-budget-btn" class="text-btn">Editar Plan</button -->
+                </div>
+                <div id="categories-container" class="categories-list">
+                    <!-- Cards de categorias se inyectaran aquí -->
+                </div>
+            </section>
+
+            <!-- Vista Historial -->
+            <section id="history-view" class="view hidden">
+                <div class="section-header">
+                    <h3>Gastos del Mes</h3>
+                </div>
+                <div id="history-container" class="history-list">
+                    <!-- Transacciones aquí -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Botón Flotante -->
+    <button id="add-fab" class="fab">+</button>
+
+    <!-- Modal Agregar Transacción -->
+    <div id="transaction-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="modal-title">Registrar Movimiento</h3>
+            <form id="transaction-form">
+                <div class="form-group">
+                    <label>Categoría</label>
+                    <select id="t-category" required></select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Monto</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="number" id="t-amount" step="0.01" required placeholder="0.00" style="flex: 1;">
+                        <select id="t-currency" style="width: auto; background-color: var(--card-bg); color: var(--text-color); border: 1px solid var(--border-color); border-radius: 8px; padding: 0 12px; font-weight: 500; font-size: 14px;">
+                            <option value="USD">USD ($)</option>
+                            <option value="VES">BS (Bs)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Fecha</label>
+                    <input type="date" id="t-date" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Nota (Opcional)</label>
+                    <input type="text" id="t-note" placeholder="Ej: Supermercado chino...">
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn cancel-btn" onclick="closeModal('transaction-modal')">Cancelar</button>
+                    <button type="submit" class="btn primary-btn">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Configuración Categorías -->
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="section-header">
+                <h3 style="margin-bottom: 0;">Categorías</h3>
+                <button type="button" class="btn primary-btn btn-sm" onclick="openCatForm()">+ Nueva</button>
+            </div>
+            <div id="settings-cat-list" class="settings-list"></div>
+            <div class="modal-actions">
+                <button type="button" class="btn cancel-btn" onclick="closeModal('settings-modal')">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Formulario Categoría -->
+    <div id="category-form-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="cat-modal-title">Nueva Categoría</h3>
+            <form id="category-form">
+                <input type="hidden" id="c-id">
+                <div class="form-group">
+                    <label>Tipo</label>
+                    <select id="c-type" required>
+                        <option value="expense">Gasto</option>
+                        <option value="income">Ingreso</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Nombre</label>
+                    <input type="text" id="c-name" required placeholder="Ej: Internet">
+                </div>
+                <div class="form-group">
+                    <label>Presupuesto (Meta mensual)</label>
+                    <input type="number" id="c-planned" step="0.01" placeholder="0.00">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn cancel-btn" onclick="closeModal('category-form-modal')">Cancelar</button>
+                    <button type="submit" class="btn primary-btn">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
