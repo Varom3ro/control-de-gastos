@@ -452,4 +452,11 @@ function deleteCat(id) {
 renderApp();
 fetchBCVRate();
 
-// Force deploy trigger
+// PWA Service Worker Registration
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+            .then(reg => console.log('SW Registered'))
+            .catch(err => console.log('SW Error', err));
+    });
+}
