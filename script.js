@@ -7,7 +7,24 @@ const defaultCategories = [
 
 let categories = JSON.parse(localStorage.getItem('gastos_categories')) || defaultCategories;
 let transactions = JSON.parse(localStorage.getItem('gastos_transactions')) || [];
+let wallets = JSON.parse(localStorage.getItem('gastos_wallets')) || [
+    { id: 'w1', name: 'Efectivo', balance: 0 }
+];
 let amountsHidden = localStorage.getItem('gastos_hidden') === 'true';
+
+// Migración: initialBalance -> balance
+wallets.forEach(w => {
+    if (w.initialBalance !== undefined && w.balance === undefined) {
+        w.balance = w.initialBalance;
+        delete w.initialBalance;
+    }
+    if (w.balance === undefined) w.balance = 0;
+});
+
+// Migración: Asegurar que todas las transacciones tengan un walletId
+transactions.forEach(t => {
+    if (!t.walletId) t.walletId = wallets[0].id;
+});
 
 function toggleVisibility() {
     amountsHidden = !amountsHidden;
@@ -128,13 +145,24 @@ form.addEventListener('submit', (e) => {
         note = note.trim() ? `${note} - ${bsNote}` : bsNote;
     }
 
+    const walletId = document.getElementById('t-wallet').value;
+
     transactions.push({
         id: Date.now().toString(),
         categoryId: catId,
+        walletId: walletId,
         amount: finalAmount,
-        date,
-        note
+        note: note,
+        date: date
     });
+
+    // Actualizar saldo de la billetera directamente
+    const wallet = wallets.find(w => w.id === walletId);
+    if (wallet) {
+        const catType = categories.find(c => c.id === catId);
+        if (catType && catType.type === 'income') wallet.balance += finalAmount;
+        else wallet.balance -= finalAmount;
+    }
 
     saveData();
     renderApp();
@@ -152,6 +180,7 @@ function deleteTx(id) {
 function saveData() {
     localStorage.setItem('gastos_transactions', JSON.stringify(transactions));
     localStorage.setItem('gastos_categories', JSON.stringify(categories));
+    localStorage.setItem('gastos_wallets', JSON.stringify(wallets));
 }
 
 function formatMoney(amount) {
@@ -175,37 +204,61 @@ function renderApp() {
         return parseInt(year) === currentViewYear && (parseInt(month) - 1) === currentViewMonth;
     });
 
-    // Calcular Saldo Acumulado (Disponible Global)
-    let globalAvailable = 0;
-    transactions.forEach(t => {
-        const cat = categories.find(c => c.id === t.categoryId);
-        if (cat) {
-            if (cat.type === 'income') globalAvailable += t.amount;
-            else globalAvailable -= t.amount;
-        }
-    });
+    // Saldo directo de billeteras
+    const walletBalances = {};
+    wallets.forEach(w => walletBalances[w.id] = w.balance);
+
+    let globalAvailable = Object.values(walletBalances).reduce((a, b) => a + b, 0);
 
     // Calcular montos reales del mes actual
     const catTotals = {};
     categories.forEach(c => catTotals[c.id] = 0);
 
     txMesActual.forEach(t => {
+        const cat = categories.find(c => c.id === t.categoryId);
+        if (!cat) return;
+
         if(catTotals[t.categoryId] !== undefined) {
             catTotals[t.categoryId] += t.amount;
-            const catType = categories.find(c => c.id === t.categoryId).type;
-            if(catType === 'income') totalIncome += t.amount;
+            
+            // Excluir transferencias de los totales mensuales
+            if (cat.name.includes("Transferencia")) return;
+
+            if(cat.type === 'income') totalIncome += t.amount;
             else totalSpent += t.amount;
         }
     });
 
-    // Header totals
+    // Guardar balances para la vista de billeteras
+    window.currentWalletBalances = walletBalances;
+    renderWallets();
+
+    // Llenar selector de billeteras en el form
+    const walletSelect = document.getElementById('t-wallet');
+    walletSelect.innerHTML = wallets.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+
+    // Header: Billetera principal (Efectivo) y secundarias
+    const efectivo = wallets.find(w => w.name.toLowerCase() === 'efectivo');
+    const mainBalance = efectivo ? efectivo.balance : globalAvailable;
+    totalAvailableEl.textContent = formatMoney(mainBalance);
     totalIncomeEl.textContent = formatMoney(totalIncome);
     totalSpentEl.textContent = formatMoney(totalSpent);
-    totalAvailableEl.textContent = formatMoney(globalAvailable);
-    
-    // Guardar global para el cálculo en Bs
-    window.lastGlobalAvailable = globalAvailable;
+    window.lastGlobalAvailable = mainBalance;
     updateBsBalance();
+
+    // Billeteras secundarias (las que no son Efectivo)
+    const secundarias = wallets.filter(w => w.name.toLowerCase() !== 'efectivo');
+    const leftWallet = secundarias[0];
+    const rightWallet = secundarias[1];
+
+    if (leftWallet) {
+        document.getElementById('wallet-left-name').textContent = leftWallet.name;
+        document.getElementById('wallet-left-balance').textContent = formatMoney(leftWallet.balance);
+    }
+    if (rightWallet) {
+        document.getElementById('wallet-right-name').textContent = rightWallet.name;
+        document.getElementById('wallet-right-balance').textContent = formatMoney(rightWallet.balance);
+    }
 
     // Lógica dinámica para Esparcimiento
     const salarioCat = categories.find(c => c.name.toLowerCase() === 'salario');
@@ -213,16 +266,31 @@ function renderApp() {
     if (salarioCat && esparcimientoCat) {
         let expenseMetas = 0;
         categories.forEach(c => {
-            if (c.type === 'expense' && c.id !== esparcimientoCat.id) {
+            if (c.type === 'expense' && c.id !== esparcimientoCat.id && !c.name.includes('Transferencia')) {
                 expenseMetas += c.planned;
             }
         });
         esparcimientoCat.planned = Math.max(0, salarioCat.planned - expenseMetas);
+        saveData();
     }
 
     // Render Categories
     categoriesContainer.innerHTML = '';
-    categories.forEach(cat => {
+    const visibleCats = categories.filter(cat => {
+        if (cat.type === 'income') return false;
+        if (cat.name.includes('Transferencia')) return false;
+        return true;
+    });
+    // Las que llegan al 100% van al final
+    visibleCats.sort((a, b) => {
+        const pA = a.planned > 0 ? (catTotals[a.id] || 0) / a.planned : 0;
+        const pB = b.planned > 0 ? (catTotals[b.id] || 0) / b.planned : 0;
+        const aFull = pA >= 1 ? 1 : 0;
+        const bFull = pB >= 1 ? 1 : 0;
+        return aFull - bFull;
+    });
+    visibleCats.forEach(cat => {
+
         const spent = catTotals[cat.id] || 0;
         const remaining = cat.planned - spent;
         const percent = Math.min((spent / cat.planned) * 100, 100) || 0;
@@ -536,3 +604,124 @@ function getDragAfterElement(container, y) {
         }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
+
+// WALLET LOGIC
+function renderWallets() {
+    const container = document.getElementById('wallets-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    wallets.forEach(w => {
+        const html = `
+            <div class="cat-card">
+                <div class="cat-header" style="margin-bottom: 0;">
+                    <span class="cat-name">${w.name}</span>
+                    <div style="text-align: right; display: flex; align-items: center; gap: 12px;">
+                        <span class="history-amount ${w.balance >= 0 ? 'income' : 'expense'}" style="font-size: 18px;">
+                            ${formatMoney(w.balance)}
+                        </span>
+                        <button class="edit-btn" onclick="editWallet('${w.id}')" style="font-size: 14px;">Editar</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.innerHTML += html;
+    });
+}
+
+function openWalletModal() {
+    document.getElementById('wallet-modal-title').textContent = 'Nueva Cuenta';
+    document.getElementById('wallet-form').reset();
+    document.getElementById('w-id').value = '';
+    document.getElementById('wallet-modal').classList.remove('hidden');
+}
+
+function editWallet(id) {
+    const w = wallets.find(wallet => wallet.id === id);
+    if (!w) return;
+    document.getElementById('wallet-modal-title').textContent = 'Editar Cuenta';
+    document.getElementById('w-id').value = w.id;
+    document.getElementById('w-name').value = w.name;
+    document.getElementById('w-balance').value = w.balance;
+    document.getElementById('wallet-modal').classList.remove('hidden');
+}
+
+document.getElementById('wallet-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = document.getElementById('w-id').value;
+    const name = document.getElementById('w-name').value.trim();
+    const balance = parseFloat(document.getElementById('w-balance').value) || 0;
+
+    if (!name) return;
+
+    if (id) {
+        const index = wallets.findIndex(w => w.id === id);
+        if (index !== -1) {
+            wallets[index].name = name;
+            wallets[index].balance = balance;
+        }
+    } else {
+        wallets.push({ id: 'w' + Date.now(), name: name, balance: balance });
+    }
+
+    saveData();
+    renderApp();
+    closeModal('wallet-modal');
+});
+
+// TRANSFER LOGIC
+function openTransferModal() {
+    const fromSelect = document.getElementById('tr-from');
+    const toSelect = document.getElementById('tr-to');
+    const options = wallets.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+    
+    fromSelect.innerHTML = options;
+    toSelect.innerHTML = options;
+    
+    document.getElementById('transfer-form').reset();
+    document.getElementById('transfer-modal').classList.remove('hidden');
+}
+
+document.getElementById('transfer-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fromId = document.getElementById('tr-from').value;
+    const toId = document.getElementById('tr-to').value;
+    const amount = parseFloat(document.getElementById('tr-amount').value);
+
+    if (fromId === toId) {
+        alert("La cuenta de origen y destino no pueden ser la misma.");
+        return;
+    }
+
+    if (amount <= 0) return;
+
+    // Asegurar categoría de transferencia
+    let transferCat = categories.find(c => c.name === "Transferencia (Interna)");
+    if (!transferCat) {
+        transferCat = { id: 'cat_transfer', name: "Transferencia (Interna)", type: 'expense', planned: 0 };
+        categories.push(transferCat);
+    }
+
+    const timestamp = Date.now().toString();
+    const date = new Date().toISOString().split('T')[0];
+    const fromWallet = wallets.find(w => w.id === fromId);
+    const toWallet = wallets.find(w => w.id === toId);
+
+    // Registrar en historial
+    transactions.push({
+        id: 't_tr_' + timestamp,
+        categoryId: transferCat.id,
+        walletId: fromId,
+        amount: amount,
+        note: `${fromWallet.name} → ${toWallet.name}`,
+        date: date
+    });
+
+    // Actualizar saldos directamente
+    fromWallet.balance -= amount;
+    toWallet.balance += amount;
+
+    saveData();
+    renderApp();
+    closeModal('transfer-modal');
+});

@@ -33,12 +33,16 @@
             
             <div class="main-card">
                 <p class="subtitle">Disponible</p>
-                <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; margin-bottom: 24px;">
+                <div style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; margin-bottom: 12px;">
                     <div></div>
                     <h2 id="total-available" style="margin-bottom: 0; text-align: center;">$0.00</h2>
                     <div style="text-align: left; padding-left: 8px;">
                         <span id="total-available-bs" style="font-size: 12px; color: rgba(255, 255, 255, 0.5); font-weight: 500;">Bs. 0.00</span>
                     </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+                    <span style="font-size: 12px; color: rgba(255,255,255,0.5);"><span id="wallet-left-name">Binance</span> <strong id="wallet-left-balance" style="color: var(--income);">$0.00</strong></span>
+                    <span style="font-size: 12px; color: rgba(255,255,255,0.5);"><span id="wallet-right-name">Facebank</span> <strong id="wallet-right-balance" style="color: var(--income);">$0.00</strong></span>
                 </div>
                 <div class="card-details">
                     <div class="detail col-income">
@@ -54,13 +58,14 @@
         </header>
 
         <div class="tabs">
-            <button class="tab-btn active" data-target="budget-view">Presupuesto</button>
-            <button class="tab-btn" data-target="history-view">Historial</button>
+            <button class="tab-btn active" data-target="view-dashboard">Inicio</button>
+            <button class="tab-btn" data-target="view-history">Historial</button>
+            <button class="tab-btn" data-target="view-wallets">Billeteras</button>
         </div>
 
         <main>
-            <!-- Vista Presupuesto -->
-            <section id="budget-view" class="view active">
+            <!-- Vista Dashboard (Inicio) -->
+            <section id="view-dashboard" class="view active">
                 <div class="section-header">
                     <h3>Progreso de Gastos</h3>
                     <!-- button id="edit-budget-btn" class="text-btn">Editar Plan</button -->
@@ -71,12 +76,26 @@
             </section>
 
             <!-- Vista Historial -->
-            <section id="history-view" class="view hidden">
+            <section id="view-history" class="view hidden">
                 <div class="section-header">
                     <h3>Gastos del Mes</h3>
                 </div>
                 <div id="history-container" class="history-list">
                     <!-- Transacciones aquí -->
+                </div>
+            </section>
+
+            <!-- Vista Billeteras -->
+            <section id="view-wallets" class="view hidden">
+                <div class="section-header">
+                    <h3>Mis Cuentas</h3>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="text-btn" onclick="openTransferModal()">⇄ Transferir</button>
+                        <button class="text-btn" onclick="openWalletModal()">+ Nueva Cuenta</button>
+                    </div>
+                </div>
+                <div id="wallets-container" class="categories-list">
+                    <!-- Se llena con JS -->
                 </div>
             </section>
         </main>
@@ -104,6 +123,11 @@
                             <option value="USD">USD ($)</option>
                         </select>
                     </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Cuenta / Billetera</label>
+                    <select id="t-wallet" required></select>
                 </div>
 
                 <div class="form-group">
@@ -178,6 +202,53 @@
                 <div class="modal-actions">
                     <button type="button" class="btn cancel-btn" onclick="closeModal('category-form-modal')">Cancelar</button>
                     <button type="submit" class="btn primary-btn">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Billetera -->
+    <div id="wallet-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 id="wallet-modal-title">Nueva Cuenta</h3>
+            <form id="wallet-form">
+                <input type="hidden" id="w-id">
+                <div class="form-group">
+                    <label>Nombre de la Cuenta</label>
+                    <input type="text" id="w-name" required placeholder="Ej: Efectivo, Banco Mercantil...">
+                </div>
+                <div class="form-group">
+                    <label>Saldo Actual ($)</label>
+                    <input type="number" id="w-balance" step="0.01" required placeholder="0.00">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn cancel-btn" onclick="closeModal('wallet-modal')">Cancelar</button>
+                    <button type="submit" class="btn primary-btn">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Transferencia -->
+    <div id="transfer-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Transferir entre Cuentas</h3>
+            <form id="transfer-form">
+                <div class="form-group">
+                    <label>Desde (Origen)</label>
+                    <select id="tr-from" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Hacia (Destino)</label>
+                    <select id="tr-to" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Monto ($)</label>
+                    <input type="number" id="tr-amount" step="0.01" required placeholder="0.00">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn cancel-btn" onclick="closeModal('transfer-modal')">Cancelar</button>
+                    <button type="submit" class="btn primary-btn">Transferir</button>
                 </div>
             </form>
         </div>
